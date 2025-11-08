@@ -137,5 +137,133 @@ video.addEventListener('ended', async ()=>{ stage.classList.remove('show'); awai
 // RSVP -> WA
 document.getElementById('rsvpForm').addEventListener('submit', function(e){ e.preventDefault(); const name = document.getElementById('rsvpName').value.trim(); const coming = document.getElementById('rsvpComing').value; const msg = document.getElementById('rsvpMsg').value.trim(); if(!name||!coming){ alert('Mohon lengkapi nama dan konfirmasi kehadiran.'); return; } const text = `Assalamualaikum, saya ${name} - Konfirmasi: ${coming}${msg?(' - Pesan: '+msg):''} - Untuk Albi & Aulia`; const waUrl = `https://wa.me/${RSVP_WA}?text=` + encodeURIComponent(text); window.open(waUrl, '_blank'); });
 </script>
+
+<!-- ========== BAGIAN RSVP & KOMENTAR (HALAMAN AKHIR) ========== -->
+<section id="rsvp" style="padding:60px 20px;background:#eaf6ef;text-align:center;animation:fadeIn 1.5s ease;">
+  <h2 style="font-family:'Playfair Display',serif;font-size:28px;color:#043927;margin-bottom:10px;">
+    Ucapan & Konfirmasi Kehadiran
+  </h2>
+  <p style="font-family:'Inter',sans-serif;color:#667b71;margin-bottom:30px;">
+    Dengan senang hati kami menerima ucapan & konfirmasi kehadiran dari Anda 💌
+  </p>
+
+  <div id="stats" style="display:flex;justify-content:center;gap:15px;flex-wrap:wrap;margin-bottom:25px;">
+    <div style="background:#6aa06a;color:white;padding:12px 25px;border-radius:12px;min-width:130px;box-shadow:0 3px 6px rgba(0,0,0,0.1);">
+      <strong style="font-size:20px;" id="hadirCount">0</strong><br><span>Hadir</span>
+    </div>
+    <div style="background:#c94f4f;color:white;padding:12px 25px;border-radius:12px;min-width:130px;box-shadow:0 3px 6px rgba(0,0,0,0.1);">
+      <strong style="font-size:20px;" id="tidakCount">0</strong><br><span>Tidak Hadir</span>
+    </div>
+    <div style="background:#c9a04b;color:white;padding:12px 25px;border-radius:12px;min-width:130px;box-shadow:0 3px 6px rgba(0,0,0,0.1);">
+      <strong style="font-size:20px;" id="raguCount">0</strong><br><span>Masih Ragu</span>
+    </div>
+  </div>
+
+  <form id="commentForm" style="max-width:420px;margin:0 auto;text-align:left;background:white;padding:20px;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,0.1);">
+    <label style="font-family:'Inter',sans-serif;font-size:14px;color:#043927;">Nama</label>
+    <input id="nama" name="nama" placeholder="Tulis nama Anda..." required style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #ccc;border-radius:6px;font-family:'Inter',sans-serif;">
+
+    <label style="font-family:'Inter',sans-serif;font-size:14px;color:#043927;">Ucapan</label>
+    <textarea id="ucapan" name="ucapan" placeholder="Tulis ucapan atau doa..." rows="3" required style="width:100%;padding:10px;margin-bottom:12px;border:1px solid #ccc;border-radius:6px;font-family:'Inter',sans-serif;"></textarea>
+
+    <label style="font-family:'Inter',sans-serif;font-size:14px;color:#043927;">Konfirmasi Kehadiran</label>
+    <select id="status" name="status" required style="width:100%;padding:10px;margin-bottom:20px;border:1px solid #ccc;border-radius:6px;font-family:'Inter',sans-serif;">
+      <option value="">-- Pilih salah satu --</option>
+      <option value="Hadir">Hadir</option>
+      <option value="Tidak Hadir">Tidak Hadir</option>
+      <option value="Masih Ragu">Masih Ragu</option>
+    </select>
+
+    <button type="submit" style="width:100%;background:#6aa06a;color:white;border:none;padding:12px;border-radius:8px;font-family:'Playfair Display',serif;font-size:16px;cursor:pointer;transition:0.3s;">
+      Kirim Ucapan
+    </button>
+  </form>
+
+  <div id="comments" style="margin-top:40px;text-align:left;max-width:520px;margin-inline:auto;"></div>
+</section>
+
+<style>
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+  import { getDatabase, ref, push, onValue } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDLCk9CVZybr0DrUHAAUHeSezpRpN3kfNI",
+    authDomain: "undangan-albi-aulia.firebaseapp.com",
+    databaseURL: "https://undangan-albi-aulia-default-rtdb.firebaseio.com",
+    projectId: "undangan-albi-aulia",
+    storageBucket: "undangan-albi-aulia.firebasestorage.app",
+    messagingSenderId: "1010527155571",
+    appId: "1:1010527155571:web:e3af40d42f24ac8c5c8106",
+    measurementId: "G-DVRQQFD6EG"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const commentsRef = ref(db, "comments");
+
+  const form = document.getElementById("commentForm");
+  const commentsDiv = document.getElementById("comments");
+  const hadirCount = document.getElementById("hadirCount");
+  const tidakCount = document.getElementById("tidakCount");
+  const raguCount = document.getElementById("raguCount");
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const data = {
+      nama: form.nama.value.trim(),
+      ucapan: form.ucapan.value.trim(),
+      status: form.status.value,
+      time: new Date().toISOString(),
+    };
+    if (!data.nama || !data.ucapan || !data.status) return alert("Mohon lengkapi semua data!");
+    push(commentsRef, data);
+    form.reset();
+
+    const successMsg = document.createElement("div");
+    successMsg.textContent = "Terima kasih! Ucapan kamu sudah terkirim 💌";
+    successMsg.style = "margin-top:15px;text-align:center;color:#6aa06a;font-family:'Inter';animation:fadeIn 1s;";
+    form.appendChild(successMsg);
+    setTimeout(() => successMsg.remove(), 3000);
+  });
+
+  onValue(commentsRef, (snapshot) => {
+    const data = snapshot.val();
+    commentsDiv.innerHTML = "";
+    let hadir = 0, tidak = 0, ragu = 0;
+    if (data) {
+      Object.values(data).forEach((d) => {
+        if (d.status === "Hadir") hadir++;
+        if (d.status === "Tidak Hadir") tidak++;
+        if (d.status === "Masih Ragu") ragu++;
+
+        const el = document.createElement("div");
+        el.style = "background:#fff;border-radius:10px;padding:12px 15px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.08);animation:fadeIn 0.8s ease;";
+        el.innerHTML = `
+          <strong style="color:#043927;">${d.nama} ${
+            d.status === "Hadir"
+              ? "✅"
+              : d.status === "Tidak Hadir"
+              ? "❌"
+              : "🤔"
+          }</strong><br>
+          <span style="color:#333;">${d.ucapan}</span><br>
+          <small style="color:#999;">${new Date(d.time).toLocaleString("id-ID")}</small>
+        `;
+        commentsDiv.prepend(el);
+      });
+    }
+    hadirCount.textContent = hadir;
+    tidakCount.textContent = tidak;
+    raguCount.textContent = ragu;
+  });
+</script>
+
 </body>
 </html>
